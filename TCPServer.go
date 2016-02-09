@@ -1,35 +1,64 @@
 package main
 
 import (
-	"fmt"
-	"net"
 	"bufio"
-"strings"
+	"errors"
+	"net"
+	"strconv"
+	"strings"
 )
 
-func main() {
-	fmt.Println("Launching server...")
+type TCPServer struct {
+	//Local address to listen on. "" will listen on all
+	localAddr  string
+	port       int
+	listener   net.Listener
+	connection net.Conn
+}
 
-	ln, err := net.Listen("tcp", ":8085")
+/*
+	Starts listening. Can block thread due to loop.
+	Messages and errors will be written to chan messages and err.
+*/
+func (server *TCPServer) start(messages chan string, errs chan error) {
 
-	if err != nil{
-		fmt.Print(err)
+	var err error
+
+	server.listener, err = net.Listen("tcp", server.localAddr+":"+strconv.Itoa(server.port))
+
+	if err != nil {
+		errs <- err
 	}
 
-	conn, err := ln.Accept()
+	server.connection, err = server.listener.Accept()
 
-	if err != nil{
-		fmt.Print(err)
+	defer server.connection.Close()
+	defer server.listener.Close()
+
+	if err != nil {
+		errs <- err
 	}
 
 	for {
-		// will listen for message to process ending in newline (\n)
-		message, _ := bufio.NewReader(conn).ReadString('\n')
-		// output message received
-		fmt.Print("Message Received:", string(message))
-		// sample process for string received
+
+		message, _ := bufio.NewReader(server.connection).ReadString('\n')
+
+		if message == "" {
+
+			errs <- errors.New("Received empty message.")
+			break
+		}
+
+		messages <- message
+
 		newmessage := strings.ToUpper(message)
-		// send new string back to client
-		conn.Write([]byte(newmessage + "\n"))
+
+		server.connection.Write([]byte(newmessage + "\n"))
 	}
+}
+
+func (server *TCPServer) send(message string) error {
+	_, err := server.connection.Write([]byte(message))
+
+	return err
 }
