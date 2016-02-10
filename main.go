@@ -15,14 +15,15 @@ func main() {
 
 	go func() {
 		for {
-			fmt.Println("[Received] " + <-messages)
+			e := <-errs
+			fmt.Println("[Error] " + e.Error())
+			panic("whooooops")
 		}
 	}()
 
 	go func() {
 		for {
-			e := <-errs
-			fmt.Println("[Error] " + e.Error())
+			fmt.Println("[Received] " + <-messages)
 		}
 	}()
 
